@@ -1,5 +1,4 @@
-import os
-import time
+
 
 class CaveScan:
 	def __init__(self, raw_paths):
@@ -105,33 +104,9 @@ class SandSimulator:
 				return (px, py)
 		return None, None
 
-class Point:
-	def __init__(self, x, y):
-		self.x = x
-		self.y = y
-
-	def __eq__(self, other):
-		return self.x == other.x and self.y == other.y
-
-	def __str__(self):
-		return f"({self.x}, {self.y})"
-
-sample = """498,4 -> 498,6 -> 496,6
-503,4 -> 502,4 -> 502,9 -> 494,9"""
-
 f = open("puzzle_input", "r")
 raw_data = f.read()
 f.close()
-
-paths = [
-	[Point(*eval(point)) for point in line.split(" -> ")]
-	for line in sample.strip().split("\n")]
-
-rocks = []
-for path in paths:
-	for start, end in zip(path, path[1:]):
-		if start.x == end.x:
-			direction = start.y - end.y
-			rocks.extend([Point(start.x, y) for y in range ])
-
+scan = CaveScan(raw_data)
+SandSimulator(scan).print()
 

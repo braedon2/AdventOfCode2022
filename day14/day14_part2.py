@@ -1,124 +1,63 @@
-import os
-import time
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
-class CaveScan:
-	def __init__(self, raw_paths):
-		self.paths = self._parse_paths(raw_paths)
-		self.xrange = self._compute_x_range()
-		self.xstart = self.xrange[0]
-		self.yrange = self._compute_y_range()
-		self.grid = [
-			["air" for x in range(*self.xrange)] 
-			for y in range(*self.yrange)]
-		self._add_rocks_to_grid()
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
 
-	def is_rock(self, x, y):
-		if x not in range(*self.xrange):
-			return False
-		if y not in range(*self.yrange):
-			return False
-		return self.grid[y][x - self.xstart] == "rock"
+    def __str__(self):
+        return f"({self.x}, {self.y})"
 
-	def _parse_paths(self, raw_paths):
-		return[
-			[eval(point) for point in line.split(" -> ")]
-			for line in raw_paths.strip().split("\n")
-		]
-
-	def _compute_x_range(self):
-		corners = [point for path in self.paths for point in path]
-		return (
-			min([point[0] for point in corners]),
-			max([point[0] for point in corners]) + 1)
-
-	def _compute_y_range(self):
-		corners = [point for path in self.paths for point in path]
-		return (
-			0,
-			max([point[1] for point in corners]) + 1)
-
-	def _add_rocks_to_grid(self):
-		for path in self.paths:
-			start = path[0]
-			for point in path[1:]:
-				end = point
-				if start[0] == end[0]:
-					yoffset = min(start[1], end[1])
-					self._add_rocks_to_x(start[0], start[1], end[1])
-				if start[1] == end[1]:
-					self._add_rocks_y(start[1], start[0], end[0])
-				start = end
-
-	def _add_rocks_y(self, y, xstart, xend):
-		offset = min(xstart, xend)
-		for i in range(abs(xstart - xend) + 1):
-			self.grid[y][i + offset - self.xstart] = "rock"
-
-	def _add_rocks_to_x(self, x, ystart, yend):
-		offset = min(ystart, yend)
-		for i in range(abs(ystart - yend) + 1):
-			self.grid[i + offset][x - self.xstart] = "rock"
+    def __hash__(self):
+        return hash((self.x, self.y))
 
 
-class SandSimulator:
-	def __init__(self, scan):
-		self.scan = scan
-		self.abyss_reached = False
-		self.sand_locations = []
-		self.sand_start_x = 500
-		self.sand_start_y = 0
+def get_next_point(point, rocks, sand, floor):
+    test_order = [
+        Point(point.x, point.y+1),
+        Point(point.x-1, point.y+1),
+        Point(point.x+1, point.y+1)]
 
-	def print(self):
-		for y in range(*self.scan.yrange):
-			rowstr = f"{y} "
-			for x in range(*self.scan.xrange):
-				if (x, y) == (self.sand_start_x, self.sand_start_y):
-					rowstr += "+"
-				elif self.scan.is_rock(x, y):
-					rowstr += "#"
-				elif (x, y) in self.sand_locations:
-					rowstr += "O"
-				else:
-					rowstr += "."
-			print(rowstr)
-
-	def simulate_grain_of_sand(self):
-		self._find_resting_place(self.sand_start_x, self.sand_start_y)
-
-	def _find_resting_place(self, x, y):
-		if self.abyss_reached == True:
-			return
-		
-		next_x, next_y = self._get_next_point(x, y)
-		if next_x == None:
-			self.sand_locations.append((x, y))
-		elif next_x not in range(*self.scan.xrange) or next_y not in range(*self.scan.yrange):
-			self.abyss_reached = True
-		else:
-			self._find_resting_place(next_x, next_y)
-
-	def _get_next_point(self, x, y):
-		test_order = [(x, y+1), (x-1, y+1), (x+1, y+1)]
-		for point in test_order:
-			px, py = point
-			if (not self.scan.is_rock(px, py)) and (not (px, py) in self.sand_locations):
-				return (px, py)
-		return None, None
+    for test_point in test_order:
+        if test_point not in (rocks | sand) and test_point.y < floor:
+            return test_point
+    return point
 
 
-
+sample = """498,4 -> 498,6 -> 496,6
+503,4 -> 502,4 -> 502,9 -> 494,9"""
 
 f = open("puzzle_input", "r")
 raw_data = f.read()
 f.close()
 
-scan = CaveScan(raw_data)
-simulator = SandSimulator(scan)
+paths = [
+    [Point(*eval(point)) for point in line.split(" -> ")]
+    for line in raw_data.strip().split("\n")]
 
-while not simulator.abyss_reached:
-	os.system("clear")
-	simulator.simulate_grain_of_sand()
-	simulator.print()
-	#time.sleep(0.1)
+rocks = set()
+for path in paths:
+    for first, second in zip(path, path[1:]):
+        startx, endx = sorted([first.x, second.x])
+        starty, endy = sorted([first.y, second.y])
+        rocks |= set(([Point(i, j) 
+            for i in range(startx, endx + 1)
+            for j in range(starty, endy + 1)]))
 
-print(len(simulator.sand_locations))
+floor = max([r.y for r in rocks]) + 2
+print(floor)
+sand = set()
+while Point(500, 0) not in sand:
+    current_point = Point(500, 0)
+    found_new_point = True
+    while found_new_point:
+        next_point = get_next_point(current_point, rocks, sand, floor)
+        if next_point == current_point:
+            found_new_point = False
+        current_point = next_point
+    sand.add(current_point)
+    print(len(sand), min(s.y for s in sand))
+
+
+print(len(sand))
