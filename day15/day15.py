@@ -52,3 +52,4 @@ for sensor_beacon in sensor_beacons:
         coverage.add(Point(i, row_to_test))
 
 print(len(coverage - beacons_at_row))
+
