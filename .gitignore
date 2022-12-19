@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Sublime
+AdventOfCode2022.sublime-project
+AdventOfCode2022.sublime-workspace
