@@ -1,6 +1,10 @@
 from dataclasses import dataclass, field
 from collections import deque
 import re
+from itertools import chain, combinations
+from functools import cache
+
+MINUTES_ALLOTTED = 26
 
 @dataclass
 class Valve:
@@ -17,6 +21,15 @@ class Valve:
 
 	def __eq__(self, other):
 		return self.name == other.name
+
+	def __hash__(self):
+		return hash(self.name)
+
+# from https://docs.python.org/3/library/itertools.html#itertools-recipes
+# hacked to only return subsets of size 8
+def powerset(iterable):
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(8, 9))
 
 
 def bfs(root: Valve) -> dict:
@@ -36,22 +49,53 @@ def pre_compute_paths(vavles: dict) -> None:
 	for name, valve in valves.items():
 		valve.paths = bfs(valve)
 
-
-def build_solutions(valves: list[Valve], prev: Valve, minute=1) -> list[list]:
-	if minute > 30 or not valves:
+#@cache
+def build_solutions(
+	valves: tuple[Valve], 
+	prev: Valve, 
+	minute=1) -> list[list]:
+	if minute > MINUTES_ALLOTTED or not valves:
 		return []
 
 	solutions = []
 	distances = [prev.paths[v.name] for v in valves]
 	for valve, d in zip(valves, distances):
 		sublist = [v for v in valves if v != valve]
-		sub_solutions = build_solutions(sublist, valve, minute+d+1)
+		sub_solutions = build_solutions(tuple(sublist), valve, minute+d+1)
 		if sub_solutions:
 			solutions.extend([[valve] + ss for ss in sub_solutions])
 		else:
 			solutions.extend([[valve]])
 
-	return solutions	
+	return solutions			
+
+
+#@cache
+def get_solution_pressure(solution, start):
+	total_pressure = 0
+	minutes_left = MINUTES_ALLOTTED
+	prev_valve = start
+	for valve in solution:
+		distance = prev_valve.paths[valve.name]
+		minutes_left -= distance + 1
+		if minutes_left > 0:
+			total_pressure += valve.flow_rate * minutes_left
+		prev_valve = valve
+	return total_pressure
+
+
+def compute_max_pressure_from_subset_pair(first, second, start):
+	pressure = 0
+	first_solutions = build_solutions(tuple(first), start)
+	second_solutions = build_solutions(tuple(second), start)
+
+	if first_solutions:
+		pressure += max([get_solution_pressure(tuple(s), start) for s in first_solutions])
+
+	if second_solutions:
+		pressure += max([get_solution_pressure(tuple(s), start) for s in second_solutions])
+
+	return pressure
 
 
 f = open("puzzle_input", "r")
@@ -73,23 +117,18 @@ for line in lines.strip().split("\n"):
 	valves[name].neighbours = [valves[n[:2]] for n in neighbour_strings]
 
 pre_compute_paths(valves)
-non_zero_valves = [v for _, v in valves.items() if v.flow_rate]
-solutions = build_solutions(non_zero_valves, valves['AA'])
-print(len(solutions))
+non_zero_valves = [v for (_, v) in valves.items() if v.flow_rate]
 
-solution_pressures = []
-for solution in solutions:
-	total_pressure = 0
-	#pressure = 0
-	minute = 30
-	current_valve = valves['AA']
-	for valve in solution:
-		distance = current_valve.paths[valve.name]
-		minute -= distance + 1
-		if minute > 0:
-			total_pressure += valve.flow_rate * minute
-		current_valve = valve
-	solution_pressures.append(total_pressure)
+current_max = 0
+i = 0
+for subset in powerset(non_zero_valves):
+	print(subset)
+	print(current_max)
+	i += 1
+	complement = set(non_zero_valves) - set(subset)
+	pressure = compute_max_pressure_from_subset_pair(subset, complement, valves['AA'])
+	if pressure > current_max:
+		current_max = pressure
 
-print(max(solution_pressures))
+print(current_max)
 
