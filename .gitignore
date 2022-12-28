@@ -131,3 +131,6 @@ dmypy.json
 # Sublime
 AdventOfCode2022.sublime-project
 AdventOfCode2022.sublime-workspace
+
+# pycharm
+.idea
