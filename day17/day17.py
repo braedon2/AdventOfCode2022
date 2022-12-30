@@ -1,6 +1,6 @@
-from collections.abc import Generator
 from dataclasses import dataclass
-
+from collections import deque
+import math
 
 @dataclass
 class Point:
@@ -46,19 +46,16 @@ class Rock:
         return str(self.points)
 
 
-def rock_shapes():
-    i = 0
-    while True:
-        yield i % 5
-        i += 1
+class WindGenerator:
+    def __init__(self, directions):
+        self.directions = directions
+        self.length = len(directions)
+        self.i = 0
 
-
-def wind_directions(deltas: list[Point]):
-    length = len(deltas)
-    i = 0
-    while True:
-        yield deltas[i % length]
-        i += 1
+    def next(self):
+        d = self.directions[self.i % self.length]
+        self.i += 1
+        return d
 
 
 def map_char_to_delta(c):
@@ -72,12 +69,12 @@ def is_valid_rock_position(rock, rock_pile):
     return within_walls and above_ground and does_not_intersect_pile
 
 
-def compute_resting_place(rock: Rock, rock_pile: set[Point], winds: Generator):
+def compute_resting_place(rock: Rock, rock_pile: set[Point], winds: WindGenerator):
     current_rock = rock
     found_resting_place = False
 
     while not found_resting_place:
-        wind_delta = next(winds)
+        wind_delta = winds.next()
         tmp = current_rock.translate(wind_delta)
         if is_valid_rock_position(tmp, rock_pile):
             current_rock = tmp
@@ -91,35 +88,48 @@ def compute_resting_place(rock: Rock, rock_pile: set[Point], winds: Generator):
     return current_rock
 
 
-def print_rock_pile(rock_pile, height):
-    for y in reversed(range(height)):
-        line = ''
-        for x in range(7):
-            if Point(x, y) in rock_pile:
-                line += '#'
-            else:
-                line += '.'
-        print(line)
+def search_for_pattern(history, pattern):
+    for i in range(len(history) - len(pattern) + 1):
+        window = history[i:i+len(pattern)]
+        if window == pattern:
+            return i
 
 
 f = open('puzzle_input', 'r')
 data = f.read()
 f.close()
 
-rock_shape_generator = rock_shapes()
-wind_generator = wind_directions([
-    map_char_to_delta(c)
-    for line in data.strip().split('\n')
-    for c in line
-])
-
+wind_generator = WindGenerator([map_char_to_delta(c) for c in data.strip()])
 height = 0
 rock_pile = set()
+prev_height = 0
+history = []
+granular_history = []
+granular_prev = 0
+pattern_size = 7  # this is the size of the pattern found in sample
+pattern_que = deque()
+trillion = 1_000_000_000_000
 
-for _ in range(1000000000000):
-    rock = Rock(next(rock_shape_generator), 2, height + 3)
+for i in range(2022):
+    if i % 5 == 0 and rock_pile:
+        pattern_que.append(height - prev_height)
+        prev_height = height
+    if len(pattern_que) > pattern_size:
+        history.append(pattern_que.popleft())
+    if i % 5 == 0 and len(pattern_que) == pattern_size:
+        pattern_start = search_for_pattern(history, list(pattern_que))
+        if pattern_start:
+            pattern_height = sum(history[pattern_start:])
+            pattern_iterations = len(history[pattern_start:]) * 5
+            chunks = math.floor(trillion / pattern_iterations)
+            leftover = (trillion % pattern_iterations) - (len(history[:pattern_start]) * 5)
+            print(chunks * pattern_height + sum(granular_history[pattern_start*5:pattern_start*5+leftover]) + sum(history[:pattern_start]))
+            break
+
+    rock = Rock(i % 5, 2, height + 3)
     rock = compute_resting_place(rock, rock_pile, wind_generator)
     height = max(height, rock.get_top() + 1)
     rock_pile |= rock.points
 
-print(height)
+    granular_history.append(height - granular_prev)
+    granular_prev = height
