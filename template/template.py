@@ -1,11 +1,11 @@
 from common import puzzle_data_as_lines
 
 
-def part_a(puzzle_data):
+def part_a(puzzle_lines: list[str]):
     pass
 
 
-def part_b(puzzle_data):
+def part_b(puzzle_lines: list[str]):
     pass
 
 
